@@ -3,7 +3,7 @@ import AudioKit
 import AVFoundation
 import XCTest
 
-#if !os(tvOS)
+#if !os(tvOS) && !os(xrOS)
 /// Tests for engine.inputNode - note can't be tested without an Info.plist
 class RecordingTests: AudioFileTestCase {
     func testMultiChannelRecording() throws {

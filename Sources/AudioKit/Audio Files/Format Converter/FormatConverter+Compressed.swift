@@ -101,6 +101,37 @@ extension FormatConverter {
             completionHandler?(Self.createError(message: "Input file can't be nil."))
             return
         }
+
+        let asset = AVURLAsset(url: inputURL)
+
+        #if os(xrOS)
+        asset.loadTracks(withMediaType: .audio) { [weak self] tracks, error in
+            guard let track = tracks?.first, error == nil else {
+                if let error {
+                    self?.completionProxy(error: Self.createError(message: "No audio was found in the input file. (error: \(error.localizedDescription)"),
+                                          completionHandler: completionHandler)
+                } else {
+                    self?.completionProxy(error: Self.createError(message: "No audio was found in the input file."),
+                                          completionHandler: completionHandler)
+                }
+
+                return
+            }
+
+            self?.convertPCMToCompressed(with: asset, track: track, completionHandler: completionHandler)
+        }
+        #else
+        guard let track = asset.tracks(withMediaType: .audio).first else {
+            completionProxy(error: Self.createError(message: "No audio was found in the input file."),
+                            completionHandler: completionHandler)
+            return
+        }
+
+        convertPCMToCompressed(with: asset, track: track, completionHandler: completionHandler)
+        #endif
+    }
+
+    private func convertPCMToCompressed(with asset: AVURLAsset, track: AVAssetTrack, completionHandler: FormatConverterCallback? = nil) {
         guard let outputURL = outputURL else {
             completionHandler?(Self.createError(message: "Output file can't be nil."))
             return
@@ -117,7 +148,6 @@ extension FormatConverter {
             return
         }
 
-        let asset = AVURLAsset(url: inputURL)
         do {
             self.reader = try AVAssetReader(asset: asset)
 
@@ -219,12 +249,6 @@ extension FormatConverter {
 
         let writerInput = AVAssetWriterInput(mediaType: .audio, outputSettings: outputSettings, sourceFormatHint: hint)
         writer.add(writerInput)
-
-        guard let track = asset.tracks(withMediaType: .audio).first else {
-            completionProxy(error: Self.createError(message: "No audio was found in the input file."),
-                            completionHandler: completionHandler)
-            return
-        }
 
         let readerOutput = AVAssetReaderTrackOutput(track: track, outputSettings: nil)
         guard reader.canAdd(readerOutput) else {
